@@ -21,64 +21,93 @@ def main():
     blockSize = int(input('> '))
     print(blockSize)
 
-    brokenMessage = hackTransposition(content, blockSize)
+    brokenMessage = hackTransposition(content, blockSize, False)
     
 
     if brokenMessage != None:
-        print('Writing decrypted text to %s.' % (outputFilename))
-
-        outputFile = open(outputFilename, 'w')
-        outputFile.write(brokenMessage)
-        outputFile.close()
+        writeToFile(outputFilename, brokenMessage)
     else:
-        print('Failed to hack encryption.')
-        print(maximum)
-        print(maxkey)
+        print('\nFailed to hack encryption.')
+        print('Highest enlish percentage:',maximum)
+        print('With corresponding key:',maxkey)
+        print('\nPress Enter to search by row or write D for done')
+        response = input('> ')
+        if response.strip().upper().startswith('D'):
+                return 
+
+        brokenMessage = hackTransposition(content, blockSize, True)
+
+        if brokenMessage != None:
+          writeToFile(outputFilename, brokenMessage)
+        else: 
+          print("Failed, try another key length or switch input/output mode")
+
+def writeToFile(outputFilename, message):
+  print('Writing decrypted text to %s.' % (outputFilename))
+  outputFile = open(outputFilename, 'w')
+  outputFile.write(message)
+  outputFile.close()
 
 # based on #http://www.crypto-it.net/eng/simple/columnar-transposition.html
-def decrypt(message, keyTuple, row=False):
-  matrix = createDecrMatrix(getKeywordSequence(keyTuple), message) if row else createDecrRowMatrix(getKeywordSequence(keyTuple), message)
+def decrypt(message, keyTuple, inByRow=False, OutByRow=True):
+  matrix = createDecrMatrix(getKeywordSequence(keyTuple), message) if not inByRow else createDecrRowMatrix(getKeywordSequence(keyTuple), message)
+  return readOutByRow(matrix) if OutByRow else readOutByColumn(matrix)
+
+def readOutByRow(matrix):
+  print("Reading out by row")
   plaintext = ""
   for r in range(len(matrix)):
     for c in range (len(matrix[r])):
       plaintext += matrix[r][c]
   return plaintext
 
+def readOutByColumn(matrix):
+  print("Reading out by column")
+  plaintext = ""
+  for c in range (len(matrix[0])):
+    for r in range(len(matrix)):
+      plaintext += matrix[r][c]
+  return plaintext
+
 # based on #http://www.crypto-it.net/eng/simple/columnar-transposition.html
 def createDecrMatrix(keywordSequence, message):
-  width = len(keywordSequence)
-  height = int(math.ceil(len(message) / width))
-  if height * width < len(message):
-    height += 1
+  print("Reading in by column")
+  width, height = getMatrixDimensions(keywordSequence, message)
   matrix = createEmptyMatrix(width, height)
   pos = 0
-  for num in range(len(keywordSequence)):
+  for num in range(width):
     column = keywordSequence.index(num+1)
     r = 0
+
     while (r < len(matrix)) and (len(matrix[r]) > column):
       matrix[r][column] = message[pos]
       r += 1
       pos += 1
-      print(matrix)
+      if len(message) == pos:
+        break
   return matrix
 
 #rewritten for row in row out
 def createDecrRowMatrix(keywordSequence, message):
-  width = len(keywordSequence)
-  height = int(len(message) / width)
-  if height * width < len(message):
-    height += 1
+  print("Reading in by row")
+  width, height = getMatrixDimensions(keywordSequence, message)
 
   matrix = createEmptyMatrix(width, height)
   pos = 0
-  for row in range(len(matrix)):
-    for column in range(len(keywordSequence)):
+  for row in range(height):
+    for column in range(width):
       matrix[row][keywordSequence[column]-1] = message[pos]
       pos += 1
       if len(message) == pos:
         break
   return matrix
 
+def getMatrixDimensions(keywordSequence, message):
+  width = len(keywordSequence)
+  height = int(len(message) / width)
+  if height * width < len(message):
+    height += 1
+  return width, height
 
 def createEmptyMatrix(width, height):
   matrix = []
@@ -96,7 +125,7 @@ def getKeywordSequence(tup):
 
 # The hackTransposition() function's code was copy/pasted from
 # transpositionHacker.py and had some modifications made.
-def hackTransposition(message, blockSize):
+def hackTransposition(message, blockSize, inByRow=False):
     print('Hacking...')
     # Python programs can be stopped at any time by pressing Ctrl-C (on
     # Windows) or Ctrl-D (on Mac and Linux)
@@ -110,8 +139,7 @@ def hackTransposition(message, blockSize):
         # We want to track the amount of time it takes to test a single key,
         # so we record the time in startTime.
         startTime = time.time()
-
-        decryptedText = decrypt(message,keys[key])
+        decryptedText = decrypt(message,keys[key], inByRow)
         englishPercentage = round(detectEnglish.getEnglishCount(decryptedText) * 100, 2)
 
         totalTime = round(time.time() - startTime, 3)
